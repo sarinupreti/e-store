@@ -22,6 +22,8 @@ npm run build
 
 ## 🎯 Your Tasks (20% to Complete)
 
+Use the provided public API endpoints from DummyJSON – no need to set up a backend.
+
 ### 1. **Product Catalog Page** (Main Task - `/pages/products/index.vue`)
 **Location**: `/pages/products/index.vue`
 
@@ -190,6 +192,7 @@ GET /products/1                  # Get single product
 ```
 
 ### Demo Users
+Optional – only needed if you want to explore auth-protected routes.
 - **Username**: `emilys` / **Password**: `emilyspass`
 - **Username**: `michaelw` / **Password**: `michaelwpass`
 
@@ -236,6 +239,14 @@ If you encounter any issues:
 2. Review the existing code structure
 3. Use the TypeScript types in `/types/index.ts`
 4. Refer to the Nuxt 3 documentation
+
+## 📤 Submission Instructions
+
+When you're done:
+- Push your solution to a public GitHub repository **OR**
+- Zip the project folder and send it to us via email
+
+Please make sure your name is included in the repo name or ZIP file.
 
 ## 🏆 Good Luck!
 
