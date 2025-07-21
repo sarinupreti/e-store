@@ -38,15 +38,91 @@
         </div>
         
         <div class="filters-section">
-          <div class="filters-placeholder">
+          <div class="mb-2">
+            <label for="category-select" class="form-label mb-1">Category</label>
+            <select
+              id="category-select"
+              v-model="selectedCategory"
+              @change="onCategoryChange"
+              class="form-input"
+              style="width: 100%; margin-bottom: 1rem;"
+            >
+              <option value="">All Categories</option>
+              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat.charAt(0).toUpperCase() + cat.slice(1) }}</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label mb-1">Price Range</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input
+                type="number"
+                class="form-input"
+                style="width: 6rem;"
+                min="0"
+                v-model.number="minPrice"
+                @input="onPriceChange"
+                placeholder="Min"
+              />
+              <span>-</span>
+              <input
+                type="number"
+                class="form-input"
+                style="width: 6rem;"
+                min="0"
+                v-model.number="maxPrice"
+                @input="onPriceChange"
+                placeholder="Max"
+              />
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label mb-1">Brand</label>
+            <div style="max-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 0.5rem; background: #f8fafc;">
+              <div v-for="brand in brands" :key="brand" style="margin-bottom: 0.25rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="checkbox" :value="brand" v-model="selectedBrands" @change="onBrandChange" />
+                  <span>{{ brand }}</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label mb-1">Rating</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <button
+                v-for="star in [5,4,3,2,1]"
+                :key="star"
+                @click="selectRating(star)"
+                :class="['btn', 'btn-outline', { 'btn-primary': minRating === star }]"
+                style="padding: 0.25rem 0.75rem; font-size: 1rem; display: flex; align-items: center; gap: 0.25rem; border-width: 2px;"
+              >
+                <span style="color: #f59e0b;">{'★'.repeat(star)}</span>
+                <span v-if="star !== 1" class="text-muted">&amp; up</span>
+              </button>
+              <button v-if="minRating" @click="clearRating" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.9rem;">Clear</button>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label for="sort-select" class="form-label mb-1">Sort By</label>
+            <select
+              id="sort-select"
+              v-model="sortOption"
+              @change="onSortChange"
+              class="form-input"
+              style="width: 100%;"
+            >
+              <option value="">Default</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="rating-desc">Rating: High to Low</option>
+              <option value="rating-asc">Rating: Low to High</option>
+              <option value="popularity-desc">Popularity</option>
+            </select>
+          </div>
+          <div class="filters-placeholder mt-2">
             <h3>🎛️ Filters Missing</h3>
             <p>Implement the following filters:</p>
             <ul>
-              <li>Category filter (dropdown)</li>
-              <li>Price range filter (slider or inputs)</li>
-              <li>Brand filter (checkbox list)</li>
-              <li>Rating filter (star rating)</li>
-              <li>Sort options (price, rating, popularity)</li>
             </ul>
           </div>
         </div>
@@ -79,22 +155,59 @@ import { ref, onMounted, watch } from 'vue'
 import { useProducts } from '~/composables/useProducts'
 import ProductCard from '~/components/ProductCard.vue'
 
-const { getAllProducts, searchProducts } = useProducts()
+const { getAllProducts, searchProducts, getCategories, getProductsByCategory } = useProducts()
 const products = ref([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+
+// Category, price, brand, rating, and sort filter state
+const categories = ref<string[]>([])
+const selectedCategory = ref('')
+const minPrice = ref<number | null>(null)
+const maxPrice = ref<number | null>(null)
+const brands = ref<string[]>([])
+const selectedBrands = ref<string[]>([])
+const minRating = ref<number | null>(null)
+const sortOption = ref('')
 
 // Search state
 const searchQuery = ref('')
 const searching = ref(false)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
+
 const fetchProducts = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await getAllProducts({ limit: 20 })
+    let params: any = { limit: 20 }
+    if (minPrice.value != null) params.minPrice = minPrice.value
+    if (maxPrice.value != null) params.maxPrice = maxPrice.value
+    if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
+    if (minRating.value != null) params.minRating = minRating.value
+    // Handle sort options
+    if (sortOption.value) {
+      if (sortOption.value.startsWith('price')) {
+        params.sortBy = 'price'
+        params.order = sortOption.value.endsWith('asc') ? 'asc' : 'desc'
+      } else if (sortOption.value.startsWith('rating')) {
+        params.sortBy = 'rating'
+        params.order = sortOption.value.endsWith('asc') ? 'asc' : 'desc'
+      } else if (sortOption.value === 'popularity-desc') {
+        params.sortBy = 'popularity'
+        params.order = 'desc'
+      }
+    }
+    let response
+    if (selectedCategory.value) {
+      response = await getProductsByCategory(selectedCategory.value, params)
+    } else {
+      response = await getAllProducts(params)
+    }
     products.value = response.products
+    // Extract unique brands from loaded products
+    const allBrands = response.products.map((p: any) => p.brand)
+    brands.value = Array.from(new Set(allBrands)).sort()
   } catch (err: any) {
     error.value = err.message || 'Failed to load products.'
   } finally {
@@ -111,8 +224,35 @@ const doSearch = async () => {
   searching.value = true
   error.value = null
   try {
-    const response = await searchProducts(searchQuery.value, { limit: 20 })
+    let params: any = { limit: 20 }
+    if (minPrice.value != null) params.minPrice = minPrice.value
+    if (maxPrice.value != null) params.maxPrice = maxPrice.value
+    if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
+    if (minRating.value != null) params.minRating = minRating.value
+    // Handle sort options
+    if (sortOption.value) {
+      if (sortOption.value.startsWith('price')) {
+        params.sortBy = 'price'
+        params.order = sortOption.value.endsWith('asc') ? 'asc' : 'desc'
+      } else if (sortOption.value.startsWith('rating')) {
+        params.sortBy = 'rating'
+        params.order = sortOption.value.endsWith('asc') ? 'asc' : 'desc'
+      } else if (sortOption.value === 'popularity-desc') {
+        params.sortBy = 'popularity'
+        params.order = 'desc'
+      }
+    }
+    let response
+    if (selectedCategory.value) {
+      // If a category is selected, search within that category
+      response = await getProductsByCategory(selectedCategory.value, { ...params, q: searchQuery.value })
+    } else {
+      response = await searchProducts(searchQuery.value, params)
+    }
     products.value = response.products
+    // Extract unique brands from loaded products
+    const allBrands = response.products.map((p: any) => p.brand)
+    brands.value = Array.from(new Set(allBrands)).sort()
   } catch (err: any) {
     error.value = err.message || 'Failed to search products.'
   } finally {
@@ -132,7 +272,68 @@ const clearSearch = () => {
   doSearch()
 }
 
-onMounted(fetchProducts)
+const fetchCategories = async () => {
+  try {
+    categories.value = await getCategories()
+  } catch (err) {
+    // ignore category errors for now
+  }
+}
+
+const onCategoryChange = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const onPriceChange = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const onBrandChange = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const selectRating = (star: number) => {
+  minRating.value = star
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const clearRating = () => {
+  minRating.value = null
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const onSortChange = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+onMounted(() => {
+  fetchCategories()
+  fetchProducts()
+})
 </script>
 
 <style scoped>
