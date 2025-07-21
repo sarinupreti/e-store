@@ -169,24 +169,41 @@
           <!-- Step 3: Order Review -->
           <div v-else-if="step === 3" class="checkout-step">
             <h2>Order Review</h2>
-            
-            <div class="incomplete-section">
-              <div class="incomplete-message">
-                <h3>🚧 Order Review Incomplete</h3>
-                <p>This section needs to be implemented:</p>
-                <ul>
-                  <li>Order summary with all items</li>
-                  <li>Shipping information review</li>
-                  <li>Payment method summary</li>
-                  <li>Terms and conditions checkbox</li>
-                  <li>Place order functionality</li>
-                </ul>
+            <div class="review-section">
+              <h3>Shipping Information</h3>
+              <ul class="review-list">
+                <li><strong>Name:</strong> {{ shippingForm.firstName }} {{ shippingForm.lastName }}</li>
+                <li><strong>Address:</strong> {{ shippingForm.address }}, {{ shippingForm.city }}, {{ shippingForm.state }} {{ shippingForm.zipCode }}</li>
+              </ul>
+              <h3>Payment Method</h3>
+              <ul class="review-list">
+                <li><strong>Method:</strong> {{ paymentForm.method === 'card' ? 'Credit Card' : paymentForm.method }}</li>
+                <li v-if="paymentForm.method === 'card'"><strong>Card:</strong> **** **** **** {{ paymentForm.cardNumber.slice(-4) }}</li>
+                <li><strong>Billing Address:</strong> {{ paymentForm.billingAddress }}</li>
+              </ul>
+              <h3>Order Items</h3>
+              <ul class="review-list">
+                <li v-for="item in cartItems" :key="item.id">
+                  {{ item.product.title }} (x{{ item.quantity }}) - ${{ (item.product.price * item.quantity).toFixed(2) }}
+                </li>
+              </ul>
+              <div class="review-totals">
+                <div><strong>Subtotal:</strong> ${{ subtotal.toFixed(2) }}</div>
+                <div><strong>Shipping:</strong> Free</div>
+                <div><strong>Tax:</strong> ${{ tax.toFixed(2) }}</div>
+                <div><strong>Total:</strong> ${{ finalTotal.toFixed(2) }}</div>
               </div>
+              <div class="form-group mt-3">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                  <input type="checkbox" v-model="termsAccepted" />
+                  I agree to the terms and conditions
+                </label>
+              </div>
+              <div v-if="orderPlaced" class="alert alert-success mt-3">Order placed successfully! Thank you for your purchase.</div>
             </div>
-            
             <div class="form-actions">
               <button @click="step = 2" class="btn btn-outline">Back to Payment</button>
-              <button class="btn btn-primary" disabled>Place Order</button>
+              <button class="btn btn-primary" :disabled="!termsAccepted || orderPlaced" @click="placeOrder">Place Order</button>
             </div>
           </div>
         </div>
@@ -317,6 +334,17 @@ const isPaymentValid = computed(() => {
     paymentForm.billingAddress.trim().length > 0
   )
 })
+
+const termsAccepted = ref(false)
+const orderPlaced = ref(false)
+
+const placeOrder = async () => {
+  orderPlaced.value = false
+  // Simulate order placement
+  await new Promise(resolve => setTimeout(resolve, 1200))
+  orderPlaced.value = true
+  // Optionally, clear cart or redirect after a delay
+}
 </script>
 
 <style scoped>
@@ -520,6 +548,37 @@ const isPaymentValid = computed(() => {
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
+}
+
+.review-section {
+  background: #f8fafc;
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: var(--shadow-sm);
+}
+.review-section h3 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.review-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem 0;
+}
+.review-list li {
+  margin-bottom: 0.5rem;
+}
+.review-totals {
+  margin-top: 1.5rem;
+  font-size: 1.1rem;
+}
+.alert-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #10b981;
+  border-radius: var(--border-radius);
+  padding: 1rem;
 }
 
 @media (max-width: 768px) {
