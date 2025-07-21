@@ -382,9 +382,10 @@ onMounted(() => {
     transition: left 0.3s ease;
   }
   
-  /* Bug: This should be .nav-menu.active but missing the active state toggle */
-  .nav-menu {
-    left: -100%;
+  .nav-menu.active {
+    left: 0;
+    box-shadow: var(--shadow-lg);
+    z-index: 999;
   }
   
   .nav-actions {
