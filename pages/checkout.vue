@@ -102,26 +102,68 @@
           <!-- Step 2: Payment Information -->
           <div v-else-if="step === 2" class="checkout-step">
             <h2>Payment Information</h2>
-            
-            <!-- TODO: Implement payment form -->
-            <div class="incomplete-section">
-              <div class="incomplete-message">
-                <h3>🚧 Payment Integration Incomplete</h3>
-                <p>This section needs to be implemented:</p>
-                <ul>
-                  <li>Credit card form with validation</li>
-                  <li>Payment method selection (card, PayPal, etc.)</li>
-                  <li>Card number formatting and validation</li>
-                  <li>Expiry date and CVV validation</li>
-                  <li>Billing address form</li>
-                </ul>
+            <form @submit.prevent="nextStep" autocomplete="off">
+              <div class="form-group mb-2">
+                <label class="form-label mb-1">Payment Method</label>
+                <div style="display: flex; gap: 1rem;">
+                  <label><input type="radio" value="card" v-model="paymentForm.method" /> Credit Card</label>
+                  <label><input type="radio" value="paypal" v-model="paymentForm.method" disabled /> PayPal (coming soon)</label>
+                </div>
               </div>
-            </div>
-            
-            <div class="form-actions">
-              <button @click="step = 1" class="btn btn-outline">Back to Shipping</button>
-              <button @click="nextStep" class="btn btn-primary" disabled>Continue to Review</button>
-            </div>
+              <div v-if="paymentForm.method === 'card'">
+                <div class="form-group mb-2">
+                  <label for="cardNumber" class="form-label">Card Number</label>
+                  <input
+                    id="cardNumber"
+                    v-model="paymentForm.cardNumber"
+                    @input="formatCardNumber"
+                    type="text"
+                    class="form-input"
+                    maxlength="19"
+                    placeholder="1234 5678 9012 3456"
+                    required
+                  />
+                  <div v-if="cardNumberError" class="form-error">{{ cardNumberError }}</div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="expiry" class="form-label">Expiry Date</label>
+                    <input
+                      id="expiry"
+                      v-model="paymentForm.expiry"
+                      @input="formatExpiry"
+                      type="text"
+                      class="form-input"
+                      maxlength="5"
+                      placeholder="MM/YY"
+                      required
+                    />
+                    <div v-if="expiryError" class="form-error">{{ expiryError }}</div>
+                  </div>
+                  <div class="form-group">
+                    <label for="cvv" class="form-label">CVV</label>
+                    <input
+                      id="cvv"
+                      v-model="paymentForm.cvv"
+                      type="password"
+                      class="form-input"
+                      maxlength="4"
+                      placeholder="123"
+                      required
+                    />
+                    <div v-if="cvvError" class="form-error">{{ cvvError }}</div>
+                  </div>
+                </div>
+                <div class="form-group mb-2">
+                  <label class="form-label mb-1">Billing Address</label>
+                  <input v-model="paymentForm.billingAddress" type="text" class="form-input" placeholder="Billing Address" required />
+                </div>
+              </div>
+              <div class="form-actions">
+                <button @click.prevent="step = 1" class="btn btn-outline" type="button">Back to Shipping</button>
+                <button class="btn btn-primary" type="submit" :disabled="!isPaymentValid">Continue to Review</button>
+              </div>
+            </form>
           </div>
           
           <!-- Step 3: Order Review -->
@@ -215,6 +257,46 @@ const shippingForm = reactive({
   zipCode: ''
 })
 
+const paymentForm = reactive({
+  method: 'card',
+  cardNumber: '',
+  expiry: '',
+  cvv: '',
+  billingAddress: ''
+})
+
+const cardNumberError = ref('')
+const expiryError = ref('')
+const cvvError = ref('')
+
+const formatCardNumber = () => {
+  // Only allow digits, format as 1234 5678 9012 3456
+  let digits = paymentForm.cardNumber.replace(/\D/g, '').slice(0, 16)
+  paymentForm.cardNumber = digits.replace(/(\d{4})(?=\d)/g, '$1 ').trim()
+  cardNumberError.value = ''
+  if (digits.length < 16) cardNumberError.value = 'Card number must be 16 digits.'
+}
+
+const formatExpiry = () => {
+  // Only allow MM/YY
+  let val = paymentForm.expiry.replace(/[^\d]/g, '').slice(0, 4)
+  if (val.length >= 3) val = val.slice(0, 2) + '/' + val.slice(2)
+  paymentForm.expiry = val
+  expiryError.value = ''
+  if (!/^\d{2}\/\d{2}$/.test(paymentForm.expiry)) expiryError.value = 'Format MM/YY'
+  else {
+    const [mm, yy] = paymentForm.expiry.split('/').map(Number)
+    if (mm < 1 || mm > 12) expiryError.value = 'Invalid month'
+  }
+}
+
+const validateCVV = () => {
+  cvvError.value = ''
+  if (!/^\d{3,4}$/.test(paymentForm.cvv)) cvvError.value = 'CVV must be 3 or 4 digits.'
+}
+
+watch(() => paymentForm.cvv, validateCVV)
+
 const tax = computed(() => subtotal.value * 0.08) // 8% tax
 const finalTotal = computed(() => subtotal.value + tax.value)
 
@@ -223,6 +305,18 @@ const nextStep = () => {
     step.value++
   }
 }
+
+const isPaymentValid = computed(() => {
+  return (
+    paymentForm.method === 'card' &&
+    paymentForm.cardNumber.replace(/\D/g, '').length === 16 &&
+    /^\d{2}\/\d{2}$/.test(paymentForm.expiry) &&
+    !expiryError.value &&
+    /^\d{3,4}$/.test(paymentForm.cvv) &&
+    !cvvError.value &&
+    paymentForm.billingAddress.trim().length > 0
+  )
+})
 </script>
 
 <style scoped>
