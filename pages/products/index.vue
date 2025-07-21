@@ -9,14 +9,30 @@
       <!-- TODO: Implement filters and search -->
       <div class="products-controls">
         <div class="search-section">
-          <div class="search-placeholder">
-            <h3>🔍 Search Functionality Missing</h3>
-            <p>Implement search input with the following features:</p>
+          <div>
+            <label for="product-search" class="form-label mb-1">Search Products</label>
+            <div style="position: relative;">
+              <input
+                id="product-search"
+                v-model="searchQuery"
+                @input="onSearchInput"
+                type="text"
+                class="form-input"
+                placeholder="Search by product title..."
+                autocomplete="off"
+                style="width: 100%;"
+              />
+              <button v-if="searchQuery" @click="clearSearch" class="btn btn-secondary" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.25rem 0.75rem; font-size: 0.9rem;">Clear</button>
+            </div>
+            <div v-if="searching" class="text-muted mt-1" style="font-size: 0.95rem;">Searching...</div>
+          </div>
+          <div class="search-placeholder mt-2">
+            <h3>�� Search Suggestions & Features</h3>
             <ul>
               <li>Search by product title</li>
               <li>Real-time search with debouncing</li>
-              <li>Search suggestions</li>
               <li>Clear search functionality</li>
+              <li>Search suggestions (future)</li>
             </ul>
           </div>
         </div>
@@ -59,18 +75,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useProducts } from '~/composables/useProducts'
 import ProductCard from '~/components/ProductCard.vue'
 
-const { getAllProducts } = useProducts()
+const { getAllProducts, searchProducts } = useProducts()
 const products = ref([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-onMounted(async () => {
+// Search state
+const searchQuery = ref('')
+const searching = ref(false)
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const fetchProducts = async () => {
+  loading.value = true
+  error.value = null
   try {
-    loading.value = true
     const response = await getAllProducts({ limit: 20 })
     products.value = response.products
   } catch (err: any) {
@@ -78,7 +100,39 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+const doSearch = async () => {
+  if (!searchQuery.value) {
+    await fetchProducts()
+    searching.value = false
+    return
+  }
+  searching.value = true
+  error.value = null
+  try {
+    const response = await searchProducts(searchQuery.value, { limit: 20 })
+    products.value = response.products
+  } catch (err: any) {
+    error.value = err.message || 'Failed to search products.'
+  } finally {
+    searching.value = false
+  }
+}
+
+const onSearchInput = () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    doSearch()
+  }, 400)
+}
+
+const clearSearch = () => {
+  searchQuery.value = ''
+  doSearch()
+}
+
+onMounted(fetchProducts)
 </script>
 
 <style scoped>
