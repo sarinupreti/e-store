@@ -149,13 +149,20 @@
           </button>
         </div>
         <template v-if="loading">
-          <div class="loading-container" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-            <span class="spinner" style="width: 2rem; height: 2rem; border: 4px solid #dbeafe; border-top: 4px solid #2563eb; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
-            <span class="ml-2">Loading products...</span>
+          <div>
+            <div v-if="viewMode === 'grid'" class="grid grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 gap-3">
+              <div v-for="n in limit" :key="n" class="skeleton-card"></div>
+            </div>
+            <div v-else class="list-view">
+              <div v-for="n in limit" :key="n" class="skeleton-list-item"></div>
+            </div>
           </div>
         </template>
         <template v-else-if="error">
-          <div class="alert alert-error text-center p-2 mb-2">{{ error }}</div>
+          <div class="alert alert-error text-center p-2 mb-2">
+            {{ error }}
+            <button class="btn btn-outline mt-2" @click="retryFetch">Retry</button>
+          </div>
         </template>
         <template v-else>
           <div v-if="products.length > 0">
@@ -413,6 +420,14 @@ const goToPage = (page: number) => {
   }
 }
 
+const retryFetch = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
 onMounted(() => {
   fetchCategories()
   fetchProducts()
@@ -582,9 +597,73 @@ onMounted(() => {
   margin-top: 0.5rem;
 }
 
+/* Skeleton loader styles */
+.skeleton-card {
+  height: 320px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  border-radius: var(--border-radius);
+  animation: skeleton-loading 1.2s infinite linear;
+}
+.skeleton-list-item {
+  height: 140px;
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+  border-radius: var(--border-radius);
+  animation: skeleton-loading 1.2s infinite linear;
+  margin-bottom: 1.5rem;
+}
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 @media (max-width: 768px) {
   .products-controls {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .search-section,
+  .filters-section {
+    padding: 1rem;
+    box-shadow: none;
+  }
+  .filters-section {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .view-toggle {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  .pagination-controls {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .list-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  .list-item img {
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+    margin-bottom: 0.5rem;
+  }
+  .btn, .form-input {
+    font-size: 1rem;
+    min-height: 2.5rem;
+  }
+  .form-label {
+    font-size: 1rem;
+  }
+  .filters-section .mb-2 {
+    margin-bottom: 1rem;
   }
 }
 </style>
