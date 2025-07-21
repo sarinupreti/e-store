@@ -130,6 +130,24 @@
       
       <!-- TODO: Implement product grid with pagination -->
       <div class="products-content">
+        <div class="view-toggle mb-3" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+          <button
+            class="btn"
+            :class="{ 'btn-primary': viewMode === 'grid', 'btn-outline': viewMode !== 'grid' }"
+            @click="setViewMode('grid')"
+            aria-label="Grid view"
+          >
+            <span style="font-size: 1.2rem;">🔲</span> Grid
+          </button>
+          <button
+            class="btn"
+            :class="{ 'btn-primary': viewMode === 'list', 'btn-outline': viewMode !== 'list' }"
+            @click="setViewMode('list')"
+            aria-label="List view"
+          >
+            <span style="font-size: 1.2rem;">📋</span> List
+          </button>
+        </div>
         <template v-if="loading">
           <div class="loading-container" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
             <span class="spinner" style="width: 2rem; height: 2rem; border: 4px solid #dbeafe; border-top: 4px solid #2563eb; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
@@ -140,8 +158,43 @@
           <div class="alert alert-error text-center p-2 mb-2">{{ error }}</div>
         </template>
         <template v-else>
-          <div v-if="products.length > 0" class="grid grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 gap-3" style="@media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); } @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); } @media (max-width: 600px) { grid-template-columns: 1fr; }">
-            <ProductCard v-for="product in products" :key="product.id" :product="product" />
+          <div v-if="products.length > 0">
+            <div v-if="viewMode === 'grid'" class="grid grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 gap-3" style="@media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); } @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); } @media (max-width: 600px) { grid-template-columns: 1fr; }">
+              <ProductCard v-for="product in products" :key="product.id" :product="product" />
+            </div>
+            <div v-else class="list-view" style="display: flex; flex-direction: column; gap: 1.5rem;">
+              <div v-for="product in products" :key="product.id" class="list-item" style="display: flex; gap: 2rem; align-items: center; background: #f8fafc; border-radius: var(--border-radius); box-shadow: var(--shadow-sm); padding: 1.5rem;">
+                <img :src="product.thumbnail" :alt="product.title" style="width: 120px; height: 120px; object-fit: cover; border-radius: var(--border-radius); background: #fff;" />
+                <div style="flex: 1;">
+                  <h3 style="margin-bottom: 0.5rem;">{{ product.title }}</h3>
+                  <div class="text-muted mb-1">Brand: {{ product.brand }}</div>
+                  <div class="mb-1">{{ product.description }}</div>
+                  <div class="mb-1">Category: {{ product.category }}</div>
+                  <div class="mb-1">Rating: <span style="color: #f59e0b;">{{ product.rating }}</span></div>
+                  <div class="mb-1">Stock: {{ product.stock }}</div>
+                  <div class="mb-1">Price: <span style="font-weight: bold; color: var(--primary-color);">${{ product.price.toFixed(2) }}</span></div>
+                  <NuxtLink :to="`/products/${product.id}`" class="btn btn-primary mt-1">View Details</NuxtLink>
+                </div>
+              </div>
+            </div>
+            <div class="pagination-controls mt-4" style="display: flex; justify-content: center; align-items: center; gap: 0.5rem;">
+              <button class="btn btn-outline" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">&laquo; Prev</button>
+              <span v-for="page in totalPages" :key="page">
+                <button
+                  class="btn"
+                  :class="{ 'btn-primary': page === currentPage, 'btn-outline': page !== currentPage }"
+                  style="min-width: 2.5rem; margin: 0 0.1rem;"
+                  @click="goToPage(page)"
+                  :disabled="page === currentPage"
+                >
+                  {{ page }}
+                </button>
+              </span>
+              <button class="btn btn-outline" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">Next &raquo;</button>
+            </div>
+            <div class="text-center text-muted mt-2" v-if="totalProducts > 0">
+              Showing {{ (skip + 1) }}-{{ Math.min(skip + limit, totalProducts) }} of {{ totalProducts }} products
+            </div>
           </div>
           <div v-else class="text-center text-muted p-3">No products found.</div>
         </template>
@@ -154,11 +207,17 @@
 import { ref, onMounted, watch } from 'vue'
 import { useProducts } from '~/composables/useProducts'
 import ProductCard from '~/components/ProductCard.vue'
+import { useStorage } from '@vueuse/core'
 
 const { getAllProducts, searchProducts, getCategories, getProductsByCategory } = useProducts()
 const products = ref([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const totalProducts = ref(0)
+const skip = ref(0)
+const limit = ref(20)
+const currentPage = ref(1)
+const totalPages = computed(() => Math.ceil(totalProducts.value / limit.value) || 1)
 
 // Category, price, brand, rating, and sort filter state
 const categories = ref<string[]>([])
@@ -175,12 +234,19 @@ const searchQuery = ref('')
 const searching = ref(false)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
+// View mode state
+const viewMode = useStorage('productViewMode', 'grid')
+
+const setViewMode = (mode: 'grid' | 'list') => {
+  viewMode.value = mode
+}
+
 
 const fetchProducts = async () => {
   loading.value = true
   error.value = null
   try {
-    let params: any = { limit: 20 }
+    let params: any = { limit: limit.value, skip: skip.value }
     if (minPrice.value != null) params.minPrice = minPrice.value
     if (maxPrice.value != null) params.maxPrice = maxPrice.value
     if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
@@ -205,6 +271,9 @@ const fetchProducts = async () => {
       response = await getAllProducts(params)
     }
     products.value = response.products
+    totalProducts.value = response.total || 0
+    skip.value = response.skip || 0
+    limit.value = response.limit || 20
     // Extract unique brands from loaded products
     const allBrands = response.products.map((p: any) => p.brand)
     brands.value = Array.from(new Set(allBrands)).sort()
@@ -224,7 +293,7 @@ const doSearch = async () => {
   searching.value = true
   error.value = null
   try {
-    let params: any = { limit: 20 }
+    let params: any = { limit: limit.value, skip: skip.value }
     if (minPrice.value != null) params.minPrice = minPrice.value
     if (maxPrice.value != null) params.maxPrice = maxPrice.value
     if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
@@ -250,6 +319,9 @@ const doSearch = async () => {
       response = await searchProducts(searchQuery.value, params)
     }
     products.value = response.products
+    totalProducts.value = response.total || 0
+    skip.value = response.skip || 0
+    limit.value = response.limit || 20
     // Extract unique brands from loaded products
     const allBrands = response.products.map((p: any) => p.brand)
     brands.value = Array.from(new Set(allBrands)).sort()
@@ -323,6 +395,17 @@ const clearRating = () => {
 }
 
 const onSortChange = () => {
+  if (searchQuery.value) {
+    doSearch()
+  } else {
+    fetchProducts()
+  }
+}
+
+const goToPage = (page: number) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  skip.value = (page - 1) * limit.value
   if (searchQuery.value) {
     doSearch()
   } else {
@@ -453,6 +536,50 @@ onMounted(() => {
   border-radius: 0.25rem;
   font-size: 0.875rem;
   color: #475569;
+}
+
+.view-toggle {
+  margin-bottom: 1.5rem;
+}
+
+.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.list-item {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+.list-item img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: var(--border-radius);
+  background: #fff;
+}
+
+.list-item h3 {
+  margin-bottom: 0.5rem;
+}
+
+.list-item .text-muted {
+  margin-bottom: 0.5rem;
+}
+
+.list-item .mb-1 {
+  margin-bottom: 0.5rem;
+}
+
+.list-item .btn {
+  margin-top: 0.5rem;
 }
 
 @media (max-width: 768px) {
