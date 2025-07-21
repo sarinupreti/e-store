@@ -38,67 +38,47 @@
       
       <!-- TODO: Implement product grid with pagination -->
       <div class="products-content">
-        <div class="products-grid-placeholder">
-          <h3>📦 Product Grid Missing</h3>
-          <p>Implement the product grid with the following features:</p>
-          <ul>
-            <li>Grid/List view toggle</li>
-            <li>Product cards with hover effects</li>
-            <li>Pagination controls</li>
-            <li>Loading states</li>
-            <li>Empty state handling</li>
-            <li>Responsive design</li>
-          </ul>
-          
-          <div class="implementation-hints">
-            <h4>Implementation Hints:</h4>
-            <ul>
-              <li>Use the <code>useProducts()</code> composable for API calls</li>
-              <li>Implement URL query parameters for filters</li>
-              <li>Use the existing <code>ProductCard</code> component</li>
-              <li>Add proper loading and error states</li>
-              <li>Consider infinite scroll or pagination</li>
-            </ul>
+        <template v-if="loading">
+          <div class="loading-container" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+            <span class="spinner" style="width: 2rem; height: 2rem; border: 4px solid #dbeafe; border-top: 4px solid #2563eb; border-radius: 50%; display: inline-block; animation: spin 1s linear infinite;"></span>
+            <span class="ml-2">Loading products...</span>
           </div>
-        </div>
+        </template>
+        <template v-else-if="error">
+          <div class="alert alert-error text-center p-2 mb-2">{{ error }}</div>
+        </template>
+        <template v-else>
+          <div v-if="products.length > 0" class="grid grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 gap-3" style="@media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); } @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); } @media (max-width: 600px) { grid-template-columns: 1fr; }">
+            <ProductCard v-for="product in products" :key="product.id" :product="product" />
+          </div>
+          <div v-else class="text-center text-muted p-3">No products found.</div>
+        </template>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// TODO: Implement the following functionality:
-// 1. Fetch products from API using useProducts() composable
-// 2. Implement search functionality with debouncing
-// 3. Add category, price, brand, and rating filters
-// 4. Implement pagination or infinite scroll
-// 5. Add grid/list view toggle
-// 6. Handle loading and error states
-// 7. Make it responsive for mobile devices
+import { ref, onMounted } from 'vue'
+import { useProducts } from '~/composables/useProducts'
+import ProductCard from '~/components/ProductCard.vue'
 
-// Example starter code:
-// const { getAllProducts, getCategories, searchProducts } = useProducts()
-// const products = ref([])
-// const categories = ref([])
-// const loading = ref(false)
-// const error = ref(null)
+const { getAllProducts } = useProducts()
+const products = ref([])
+const loading = ref(true)
+const error = ref<string | null>(null)
 
-// Fetch initial data
-// onMounted(async () => {
-//   try {
-//     loading.value = true
-//     const [productsResponse, categoriesData] = await Promise.all([
-//       getAllProducts({ limit: 20 }),
-//       getCategories()
-//     ])
-//     products.value = productsResponse.products
-//     categories.value = categoriesData
-//   } catch (err) {
-//     error.value = err.message
-//   } finally {
-//     loading.value = false
-//   }
-// })
+onMounted(async () => {
+  try {
+    loading.value = true
+    const response = await getAllProducts({ limit: 20 })
+    products.value = response.products
+  } catch (err: any) {
+    error.value = err.message || 'Failed to load products.'
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <style scoped>
