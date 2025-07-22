@@ -67,16 +67,17 @@
           <div class="spinner"></div>
         </div>
         
-        <div v-else class="categories-grid">
-          <NuxtLink
-            v-for="category in categories"
-            :key="category"
-            :to="`/products?category=${category}`"
-            class="category-card"
-          >
-            <div class="category-icon">📦</div>
-            <h3>{{ formatCategoryName(category) }}</h3>
-          </NuxtLink>
+        <!-- Category cards section removed as requested -->
+        <div v-for="category in categories.slice(0, 15)" :key="category.slug + '-products'" class="category-products-row">
+          <h3>{{ category.name }}</h3>
+          <div v-if="categoryProductsLoading[category.slug]" class="loading-container"><div class="spinner"></div></div>
+          <div v-else-if="categoryProductsError[category.slug]" class="alert alert-error">{{ categoryProductsError[category.slug] }}</div>
+          <div v-else class="products-grid">
+            <ProductCard v-for="product in categoryProducts[category.slug]" :key="product.id" :product="product" />
+          </div>
+          <div style="text-align:right; margin-top: 0.5rem;">
+            <NuxtLink :to="`/products?category=${category.slug}`" class="btn btn-outline btn-sm">View All</NuxtLink>
+          </div>
         </div>
       </div>
     </section>
@@ -85,16 +86,20 @@
 
 <script setup lang="ts">
 import type { Product } from '~/types'
+import { ref, onMounted, watch } from 'vue'
 
-const { getFeaturedProducts, getCategories } = useProducts()
+const { getFeaturedProducts, getCategories, getProductsByCategory } = useProducts()
 
 const featuredProducts = ref<Product[]>([])
-const categories = ref<string[]>([])
+const categories = ref<any[]>([])
+const categoryProducts = ref<Record<string, Product[]>>({})
+const categoryProductsLoading = ref<Record<string, boolean>>({})
+const categoryProductsError = ref<Record<string, string | null>>({})
 const loading = ref(true)
 const categoriesLoading = ref(true)
 const error = ref<string | null>(null)
 
-// Fetch featured products
+// Fetch featured products and categories
 onMounted(async () => {
   try {
     featuredProducts.value = await getFeaturedProducts(8)
@@ -105,7 +110,13 @@ onMounted(async () => {
   }
 
   try {
-    categories.value = await getCategories()
+    // If getCategories returns an array of strings, map to objects for backward compatibility
+    const cats = await getCategories();
+    if (typeof cats[0] === 'string') {
+      categories.value = cats.map((slug: string) => ({ slug, name: slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()), url: `https://dummyjson.com/products/category/${slug}` }));
+    } else {
+      categories.value = cats;
+    }
   } catch (err) {
     console.error('Failed to load categories:', err)
   } finally {
@@ -113,12 +124,27 @@ onMounted(async () => {
   }
 })
 
-const formatCategoryName = (category: string) => {
-  return category
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ')
-}
+// Watch for categories to be loaded, then fetch products for each
+watch(categories, async (newCategories) => {
+  if (!newCategories || newCategories.length === 0) return;
+  for (const category of newCategories.slice(0, 15)) {
+    console.log('Fetching products for:', category.slug);
+    categoryProductsLoading.value[category.slug] = true
+    categoryProductsError.value[category.slug] = null
+    try {
+      const res = await getProductsByCategory(category.slug, { limit: 4 })
+      console.log('Products for', category.slug, ':', res.products);
+      categoryProducts.value[category.slug] = res.products
+    } catch (err: any) {
+      categoryProductsError.value[category.slug] = err.message || 'Failed to load products'
+      console.error('Error fetching products for', category.slug, err);
+    } finally {
+      categoryProductsLoading.value[category.slug] = false
+    }
+  }
+}, { immediate: true })
+
+// formatCategoryName removed; use category.name directly
 </script>
 
 <style scoped>
@@ -234,6 +260,18 @@ const formatCategoryName = (category: string) => {
 .category-card h3 {
   font-size: 1.125rem;
   margin: 0;
+}
+
+.category-products-row {
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+.category-products-row h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+  color: var(--primary-color);
 }
 
 @media (max-width: 768px) {
