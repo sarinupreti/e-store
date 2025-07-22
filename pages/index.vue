@@ -70,7 +70,13 @@
         <!-- Category cards section removed as requested -->
         <div v-for="category in categories.slice(0, 15)" :key="category.slug + '-products'" class="category-products-row">
           <h3>{{ category.name }}</h3>
-          <div v-if="categoryProductsLoading[category.slug]" class="loading-container"><div class="spinner"></div></div>
+          <div v-if="categoryProductsLoading[category.slug]" class="products-grid">
+            <div v-for="n in 4" :key="n" class="shimmer-card">
+              <div class="shimmer-image shimmer"></div>
+              <div class="shimmer-title shimmer"></div>
+              <div class="shimmer-price shimmer"></div>
+            </div>
+          </div>
           <div v-else-if="categoryProductsError[category.slug]" class="alert alert-error">{{ categoryProductsError[category.slug] }}</div>
           <div v-else class="products-grid">
             <ProductCard v-for="product in categoryProducts[category.slug]" :key="product.id" :product="product" />
@@ -127,10 +133,13 @@ onMounted(async () => {
 // Watch for categories to be loaded, then fetch products for each
 watch(categories, async (newCategories) => {
   if (!newCategories || newCategories.length === 0) return;
+  // Set loading to true for all categories immediately
+  for (const category of newCategories.slice(0, 15)) {
+    categoryProductsLoading.value[category.slug] = true;
+    categoryProductsError.value[category.slug] = null;
+  }
   for (const category of newCategories.slice(0, 15)) {
     console.log('Fetching products for:', category.slug);
-    categoryProductsLoading.value[category.slug] = true
-    categoryProductsError.value[category.slug] = null
     try {
       const res = await getProductsByCategory(category.slug, { limit: 4 })
       console.log('Products for', category.slug, ':', res.products);
@@ -272,6 +281,42 @@ watch(categories, async (newCategories) => {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
   color: var(--primary-color);
+}
+
+/* Shimmer styles */
+.shimmer-card {
+  background: #fff;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite linear;
+}
+.shimmer-image {
+  width: 80px;
+  height: 80px;
+  border-radius: 8px;
+}
+.shimmer-title {
+  width: 60%;
+  height: 18px;
+  border-radius: 4px;
+}
+.shimmer-price {
+  width: 40%;
+  height: 14px;
+  border-radius: 4px;
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 @media (max-width: 768px) {
