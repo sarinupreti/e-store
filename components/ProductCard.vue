@@ -66,6 +66,11 @@ const addToCart = () => {
   box-shadow: var(--shadow-sm);
   overflow: hidden;
   transition: transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+  max-height: 480px;
 }
 
 .product-card:hover {
@@ -74,7 +79,9 @@ const addToCart = () => {
 }
 
 .product-link {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
   color: inherit;
 }
 
@@ -113,6 +120,10 @@ const addToCart = () => {
 
 .product-info {
   padding: 1rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
 }
 
 .product-title {
@@ -169,5 +180,6 @@ const addToCart = () => {
   margin: 0;
   border-radius: 0;
   padding: 0.75rem;
+  margin-top: auto;
 }
 </style>
