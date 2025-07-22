@@ -302,7 +302,7 @@ const formatExpiry = () => {
   expiryError.value = ''
   if (!/^\d{2}\/\d{2}$/.test(paymentForm.expiry)) expiryError.value = 'Format MM/YY'
   else {
-    const [mm, yy] = paymentForm.expiry.split('/').map(Number)
+    const [mm, _yy] = paymentForm.expiry.split('/').map(Number)
     if (mm < 1 || mm > 12) expiryError.value = 'Invalid month'
   }
 }

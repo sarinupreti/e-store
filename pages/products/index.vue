@@ -90,7 +90,6 @@
                 style="padding: 0.25rem 0.75rem; font-size: 1rem; display: flex; align-items: center; gap: 0.25rem; border-width: 2px;"
               >
                 <span style="color: #f59e0b;">{{ getStars(star) }}</span>
-                <span v-if="star !== 1" class="text-muted">&amp; up</span>
               </button>
               <button v-if="minRating" @click="clearRating" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.9rem;">Clear</button>
             </div>
@@ -246,6 +245,26 @@ const applyPriceFilter = (items: Product[]) => {
   });
 }
 
+// Helper to fetch all brands for current filter/category
+const fetchAllBrands = async () => {
+  let params: any = { limit: 1000, skip: 0 };
+  if (selectedCategory.value) params.category = selectedCategory.value;
+  if (minRating.value != null) params.minRating = minRating.value;
+  if (minPrice.value != null) params.minPrice = minPrice.value;
+  if (maxPrice.value != null) params.maxPrice = maxPrice.value;
+  let response;
+  if (searchQuery.value) {
+    response = await searchProducts(searchQuery.value, params);
+  } else if (selectedCategory.value) {
+    response = await getProductsByCategory(selectedCategory.value, params);
+  } else {
+    response = await getAllProducts(params);
+  }
+  const allBrands = response.products.map((p: any) => p.brand).filter(b => b && b.trim() !== '');
+  brands.value = Array.from(new Set(allBrands)).sort();
+}
+
+// Update fetchProducts and doSearch to call fetchAllBrands when filters change
 const fetchProducts = async () => {
   loading.value = true
   error.value = null
@@ -274,12 +293,11 @@ const fetchProducts = async () => {
     }
     let filteredProducts = applyPriceFilter(response.products)
     products.value = filteredProducts
-    totalProducts.value = filteredProducts.length
+    totalProducts.value = response.total || 0 // Use API total for pagination
     skip.value = response.skip || 0
     limit.value = response.limit || 20
-    // Extract unique brands from loaded products
-    const allBrands = filteredProducts.map((p: any) => p.brand)
-    brands.value = Array.from(new Set(allBrands)).sort()
+    // Fetch all brands for the current filter
+    await fetchAllBrands();
   } catch (err: any) {
     error.value = err.message || 'Failed to load products.'
   } finally {
@@ -321,12 +339,11 @@ const doSearch = async () => {
     }
     let filteredProducts = applyPriceFilter(response.products)
     products.value = filteredProducts
-    totalProducts.value = filteredProducts.length
+    totalProducts.value = response.total || 0 // Use API total for pagination
     skip.value = response.skip || 0
     limit.value = response.limit || 20
-    // Extract unique brands from loaded products
-    const allBrands = filteredProducts.map((p: any) => p.brand)
-    brands.value = Array.from(new Set(allBrands)).sort()
+    // Fetch all brands for the current filter
+    await fetchAllBrands();
   } catch (err: any) {
     error.value = err.message || 'Failed to search products.'
   } finally {

@@ -46,7 +46,7 @@
     </header>
 
     <main class="app-main">
-      <slot />
+      <NuxtPage />
     </main>
 
     <footer class="app-footer">
