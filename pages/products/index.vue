@@ -16,6 +16,8 @@
                 id="product-search"
                 v-model="searchQuery"
                 @input="onSearchInput"
+                @focus="fetchSuggestions(searchQuery)"
+                @blur="onSearchBlur"
                 type="text"
                 class="form-input"
                 placeholder="Search by product title..."
@@ -23,6 +25,9 @@
                 style="width: 100%;"
               />
               <button v-if="searchQuery" @click="clearSearch" class="btn btn-secondary" style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); padding: 0.25rem 0.75rem; font-size: 0.9rem;">Clear</button>
+              <ul v-if="showSuggestions && suggestions.length" class="autocomplete-dropdown">
+                <li v-for="s in suggestions" :key="s" @mousedown.prevent="onSuggestionClick(s)">{{ s }}</li>
+              </ul>
             </div>
             <div v-if="searching" class="text-muted mt-1" style="font-size: 0.95rem;">Searching...</div>
           </div>
@@ -116,6 +121,9 @@
       
       <!-- TODO: Implement product grid with pagination -->
       <div class="products-content">
+        <div v-if="loading || searching" class="loading-spinner-container">
+          <div class="spinner"></div>
+        </div>
         <div class="view-toggle mb-3" style="display: flex; justify-content: flex-end; gap: 0.5rem;">
           <button
             class="btn"
@@ -227,6 +235,8 @@ const sortOption = ref('')
 const searchQuery = ref('')
 const searching = ref(false)
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+const suggestions = ref<string[]>([])
+const showSuggestions = ref(false)
 
 // View mode state
 const viewMode = useStorage('productViewMode', 'grid')
@@ -351,11 +361,38 @@ const doSearch = async () => {
   }
 }
 
+const fetchSuggestions = async (query: string) => {
+  if (!query) {
+    suggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+  try {
+    const res = await searchProducts(query, { limit: 8 })
+    suggestions.value = res.products.map((p: Product) => p.title)
+    showSuggestions.value = suggestions.value.length > 0
+  } catch {
+    suggestions.value = []
+    showSuggestions.value = false
+  }
+}
+
 const onSearchInput = () => {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => {
     doSearch()
+    fetchSuggestions(searchQuery.value)
   }, 400)
+}
+
+const onSuggestionClick = (title: string) => {
+  searchQuery.value = title
+  showSuggestions.value = false
+  doSearch()
+}
+
+const onSearchBlur = () => {
+  setTimeout(() => { showSuggestions.value = false }, 200)
 }
 
 const clearSearch = () => {
@@ -701,5 +738,47 @@ onMounted(() => {
   .filters-section .mb-2 {
     margin-bottom: 1rem;
   }
+}
+.loading-spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 6px solid #e5e7eb;
+  border-top: 6px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.autocomplete-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 10;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 0.5rem 0.5rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.autocomplete-dropdown li {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.autocomplete-dropdown li:hover {
+  background: #f1f5f9;
 }
 </style>
