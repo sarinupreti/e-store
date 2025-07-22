@@ -26,15 +26,6 @@
             </div>
             <div v-if="searching" class="text-muted mt-1" style="font-size: 0.95rem;">Searching...</div>
           </div>
-          <div class="search-placeholder mt-2">
-            <h3>�� Search Suggestions & Features</h3>
-            <ul>
-              <li>Search by product title</li>
-              <li>Real-time search with debouncing</li>
-              <li>Clear search functionality</li>
-              <li>Search suggestions (future)</li>
-            </ul>
-          </div>
         </div>
         
         <div class="filters-section">
@@ -48,7 +39,9 @@
               style="width: 100%; margin-bottom: 1rem;"
             >
               <option value="">All Categories</option>
-              <option v-for="cat in categories" :key="cat" :value="cat">{{ cat.charAt(0).toUpperCase() + cat.slice(1) }}</option>
+              <option v-for="cat in categories" :key="cat.name" :value="cat.name">
+                {{ cat.name }}
+              </option>
             </select>
           </div>
           <div class="mb-2">
@@ -96,7 +89,7 @@
                 :class="['btn', 'btn-outline', { 'btn-primary': minRating === star }]"
                 style="padding: 0.25rem 0.75rem; font-size: 1rem; display: flex; align-items: center; gap: 0.25rem; border-width: 2px;"
               >
-                <span style="color: #f59e0b;">{'★'.repeat(star)}</span>
+                <span style="color: #f59e0b;">{{ getStars(star) }}</span>
                 <span v-if="star !== 1" class="text-muted">&amp; up</span>
               </button>
               <button v-if="minRating" @click="clearRating" class="btn btn-secondary" style="padding: 0.25rem 0.75rem; font-size: 0.9rem;">Clear</button>
@@ -118,12 +111,6 @@
               <option value="rating-asc">Rating: Low to High</option>
               <option value="popularity-desc">Popularity</option>
             </select>
-          </div>
-          <div class="filters-placeholder mt-2">
-            <h3>🎛️ Filters Missing</h3>
-            <p>Implement the following filters:</p>
-            <ul>
-            </ul>
           </div>
         </div>
       </div>
@@ -166,7 +153,7 @@
         </template>
         <template v-else>
           <div v-if="products.length > 0">
-            <div v-if="viewMode === 'grid'" class="grid grid-cols-1 grid-cols-2 grid-cols-3 grid-cols-4 gap-3" style="@media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); } @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); } @media (max-width: 600px) { grid-template-columns: 1fr; }">
+            <div v-if="viewMode === 'grid'" class="products-grid">
               <ProductCard v-for="product in products" :key="product.id" :product="product" />
             </div>
             <div v-else class="list-view" style="display: flex; flex-direction: column; gap: 1.5rem;">
@@ -211,13 +198,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useProducts } from '~/composables/useProducts'
 import ProductCard from '~/components/ProductCard.vue'
 import { useStorage } from '@vueuse/core'
+import type { Product } from '~/types'
 
 const { getAllProducts, searchProducts, getCategories, getProductsByCategory } = useProducts()
-const products = ref([])
+const products = ref<Product[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const totalProducts = ref(0)
@@ -227,7 +215,7 @@ const currentPage = ref(1)
 const totalPages = computed(() => Math.ceil(totalProducts.value / limit.value) || 1)
 
 // Category, price, brand, rating, and sort filter state
-const categories = ref<string[]>([])
+const categories = ref<any[]>([])
 const selectedCategory = ref('')
 const minPrice = ref<number | null>(null)
 const maxPrice = ref<number | null>(null)
@@ -248,14 +236,21 @@ const setViewMode = (mode: 'grid' | 'list') => {
   viewMode.value = mode
 }
 
+const getStars = (star: number) => '★'.repeat(star)
+
+const applyPriceFilter = (items: Product[]) => {
+  return items.filter(product => {
+    if (minPrice.value != null && product.price < minPrice.value) return false;
+    if (maxPrice.value != null && product.price > maxPrice.value) return false;
+    return true;
+  });
+}
 
 const fetchProducts = async () => {
   loading.value = true
   error.value = null
   try {
     let params: any = { limit: limit.value, skip: skip.value }
-    if (minPrice.value != null) params.minPrice = minPrice.value
-    if (maxPrice.value != null) params.maxPrice = maxPrice.value
     if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
     if (minRating.value != null) params.minRating = minRating.value
     // Handle sort options
@@ -277,12 +272,13 @@ const fetchProducts = async () => {
     } else {
       response = await getAllProducts(params)
     }
-    products.value = response.products
-    totalProducts.value = response.total || 0
+    let filteredProducts = applyPriceFilter(response.products)
+    products.value = filteredProducts
+    totalProducts.value = filteredProducts.length
     skip.value = response.skip || 0
     limit.value = response.limit || 20
     // Extract unique brands from loaded products
-    const allBrands = response.products.map((p: any) => p.brand)
+    const allBrands = filteredProducts.map((p: any) => p.brand)
     brands.value = Array.from(new Set(allBrands)).sort()
   } catch (err: any) {
     error.value = err.message || 'Failed to load products.'
@@ -301,8 +297,6 @@ const doSearch = async () => {
   error.value = null
   try {
     let params: any = { limit: limit.value, skip: skip.value }
-    if (minPrice.value != null) params.minPrice = minPrice.value
-    if (maxPrice.value != null) params.maxPrice = maxPrice.value
     if (selectedBrands.value.length > 0) params.brand = selectedBrands.value.join(',')
     if (minRating.value != null) params.minRating = minRating.value
     // Handle sort options
@@ -325,12 +319,13 @@ const doSearch = async () => {
     } else {
       response = await searchProducts(searchQuery.value, params)
     }
-    products.value = response.products
-    totalProducts.value = response.total || 0
+    let filteredProducts = applyPriceFilter(response.products)
+    products.value = filteredProducts
+    totalProducts.value = filteredProducts.length
     skip.value = response.skip || 0
     limit.value = response.limit || 20
     // Extract unique brands from loaded products
-    const allBrands = response.products.map((p: any) => p.brand)
+    const allBrands = filteredProducts.map((p: any) => p.brand)
     brands.value = Array.from(new Set(allBrands)).sort()
   } catch (err: any) {
     error.value = err.message || 'Failed to search products.'
@@ -353,7 +348,10 @@ const clearSearch = () => {
 
 const fetchCategories = async () => {
   try {
-    categories.value = await getCategories()
+    const result = await getCategories();
+    console.log('Fetched categories:', result); // Debug log
+    // Use the array of objects as returned by the API
+    categories.value = Array.isArray(result) ? result : [];
   } catch (err) {
     // ignore category errors for now
   }
@@ -616,6 +614,27 @@ onMounted(() => {
 @keyframes skeleton-loading {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+@media (max-width: 1200px) {
+  .products-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .products-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .products-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 768px) {
